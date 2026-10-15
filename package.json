@@ -1,0 +1,15 @@
+{
+  "name": "customers-qa-assessment",
+  "version": "1.0.0",
+  "description": "Assessment de QA Automation: pruebas de API (Postman/Newman), SQL y E2E sobre la app de clientes",
+  "private": true,
+  "scripts": {
+    "mock": "npm --prefix mock-app start",
+    "test:api": "newman run postman/customers-api.postman_collection.json -e postman/local.postman_environment.json -r cli",
+    "report:api": "newman run postman/customers-api.postman_collection.json -e postman/local.postman_environment.json -r cli,json,htmlextra --reporter-json-export postman/reports/newman-report.json --reporter-htmlextra-export postman/reports/newman-report.html --reporter-htmlextra-title \"Customers API - Evidencia Newman\" --suppress-exit-code && node scripts/generate-api-evidence.js"
+  },
+  "devDependencies": {
+    "newman": "^6.2.1",
+    "newman-reporter-htmlextra": "^1.23.1"
+  }
+}

@@ -1,0 +1,956 @@
+{
+  "info": {
+    "name": "Customers API - QA Assessment",
+    "description": "Pruebas de API de la app de clientes (Parte 2 del assessment).\n\nLos requests se ejecutan en orden y se encadenan: el alta del paso 01 guarda customerId, customerEmail y createStatusCode, que reutilizan los pasos siguientes. El email del alta es dinámico, por lo que la colección no depende de datos semilla ni de un endpoint de reset.\n\nLas carpetas R1, R2 y R3 corresponden a riesgos identificados en la Parte 1 (docs/01-test-cases.md). Sus resultados esperados siguen la especificación.\n\nRequiere la variable de entorno baseUrl.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "customerSchema",
+      "value": "{\"type\":\"object\",\"required\":[\"id\",\"name\",\"email\",\"status\",\"created_at\"],\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"integer\",\"minimum\":1},\"name\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":100},\"email\":{\"type\":\"string\",\"minLength\":3,\"maxLength\":254},\"status\":{\"type\":\"string\",\"enum\":[\"ACTIVE\",\"PENDING\",\"BLOCKED\"]},\"created_at\":{\"type\":\"string\",\"format\":\"date-time\"}}}"
+    },
+    {
+      "key": "errorSchema",
+      "value": "{\"type\":\"object\",\"required\":[\"error\"],\"properties\":{\"error\":{\"type\":\"object\",\"required\":[\"code\",\"message\"],\"properties\":{\"code\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"details\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"field\",\"message\"],\"properties\":{\"field\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"}}}}}}}}"
+    },
+    {
+      "key": "missingCustomerId",
+      "value": "999999999"
+    },
+    {
+      "key": "customerId",
+      "value": ""
+    },
+    {
+      "key": "customerName",
+      "value": ""
+    },
+    {
+      "key": "customerEmail",
+      "value": ""
+    },
+    {
+      "key": "customerEmailUpper",
+      "value": ""
+    },
+    {
+      "key": "createStatusCode",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Crear cliente válido [TC-01]",
+      "description": "Requisito 1 del enunciado.",
+      "item": [
+        {
+          "name": "POST /customers - alta válida",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers"
+              ]
+            },
+            "description": "TC: TC-01\nEsperado: 201 Created, header Location /customers/{id}, body Customer con los datos enviados",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{customerName}}\",\n  \"email\": \"{{customerEmail}}\",\n  \"status\": \"ACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Email dinámico: la colección funciona sin reset y en un entorno real.",
+                  "const unique = `${Date.now()}.${Math.floor(Math.random() * 10000)}`;",
+                  "pm.collectionVariables.set(\"customerName\", \"Cliente QA Automatización\");",
+                  "pm.collectionVariables.set(\"customerEmail\", `qa.auto.${unique}@example.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Se guarda siempre, antes de los asserts: lo usa R3 [TC-14].",
+                  "pm.collectionVariables.set(\"createStatusCode\", pm.response.code);",
+                  "const body = pm.response.json();",
+                  "if (body && body.id) { pm.collectionVariables.set(\"customerId\", body.id); }",
+                  "",
+                  "pm.test(\"Status code es 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Header Content-Type es application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Body cumple el esquema Customer\", function () {",
+                  "    pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get(\"customerSchema\")));",
+                  "});",
+                  "pm.test(\"Header Location apunta al cliente creado\", function () {",
+                  "    pm.response.to.have.header(\"Location\");",
+                  "    pm.expect(pm.response.headers.get(\"Location\")).to.eql(`/customers/${body.id}`);",
+                  "});",
+                  "pm.test(\"Body devuelve los datos enviados\", function () {",
+                  "    pm.expect(body.name).to.eql(pm.collectionVariables.get(\"customerName\"));",
+                  "    pm.expect(body.email).to.eql(pm.collectionVariables.get(\"customerEmail\"));",
+                  "    pm.expect(body.status).to.eql(\"ACTIVE\");",
+                  "});",
+                  "pm.test(\"created_at es una fecha ISO-8601 válida\", function () {",
+                  "    pm.expect(Number.isNaN(Date.parse(body.created_at))).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Crear cliente con email inválido [TC-06]",
+      "description": "Requisito 2 del enunciado. Un request por cada formato inválido.",
+      "item": [
+        {
+          "name": "POST /customers - email \"sin-arroba.example.com\"",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers"
+              ]
+            },
+            "description": "TC: TC-06\nEsperado: 400 Bad Request, VALIDATION_ERROR con details.field = email",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA Email Inválido\",\n  \"email\": \"sin-arroba.example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Header Content-Type es application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Body cumple el esquema Error con code VALIDATION_ERROR\", function () {",
+                  "    pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get(\"errorSchema\")));",
+                  "    pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_ERROR\");",
+                  "});",
+                  "pm.test(\"error.details incluye el campo 'email'\", function () {",
+                  "    const details = (pm.response.json().error || {}).details || [];",
+                  "    pm.expect(details.map(d => d.field)).to.include(\"email\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /customers - email \"usuario@\"",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers"
+              ]
+            },
+            "description": "TC: TC-06\nEsperado: 400 Bad Request, VALIDATION_ERROR con details.field = email",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA Email Inválido\",\n  \"email\": \"usuario@\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Header Content-Type es application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Body cumple el esquema Error con code VALIDATION_ERROR\", function () {",
+                  "    pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get(\"errorSchema\")));",
+                  "    pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_ERROR\");",
+                  "});",
+                  "pm.test(\"error.details incluye el campo 'email'\", function () {",
+                  "    const details = (pm.response.json().error || {}).details || [];",
+                  "    pm.expect(details.map(d => d.field)).to.include(\"email\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /customers - email \"usuario@dominio\"",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers"
+              ]
+            },
+            "description": "TC: TC-06\nEsperado: 400 Bad Request, VALIDATION_ERROR con details.field = email",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA Email Inválido\",\n  \"email\": \"usuario@dominio\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Header Content-Type es application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Body cumple el esquema Error con code VALIDATION_ERROR\", function () {",
+                  "    pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get(\"errorSchema\")));",
+                  "    pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_ERROR\");",
+                  "});",
+                  "pm.test(\"error.details incluye el campo 'email'\", function () {",
+                  "    const details = (pm.response.json().error || {}).details || [];",
+                  "    pm.expect(details.map(d => d.field)).to.include(\"email\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /customers - email \"usu ario@example.com\"",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers"
+              ]
+            },
+            "description": "TC: TC-06\nEsperado: 400 Bad Request, VALIDATION_ERROR con details.field = email",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA Email Inválido\",\n  \"email\": \"usu ario@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Header Content-Type es application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Body cumple el esquema Error con code VALIDATION_ERROR\", function () {",
+                  "    pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get(\"errorSchema\")));",
+                  "    pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_ERROR\");",
+                  "});",
+                  "pm.test(\"error.details incluye el campo 'email'\", function () {",
+                  "    const details = (pm.response.json().error || {}).details || [];",
+                  "    pm.expect(details.map(d => d.field)).to.include(\"email\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Crear cliente con email duplicado [TC-08]",
+      "description": "Requisito 3 del enunciado. Reutiliza el email del paso 01.",
+      "item": [
+        {
+          "name": "POST /customers - email ya registrado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers"
+              ]
+            },
+            "description": "TC: TC-08\nEsperado: 409 Conflict, EMAIL_ALREADY_EXISTS",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA Duplicado\",\n  \"email\": \"{{customerEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 409\", function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "pm.test(\"Header Content-Type es application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Body cumple el esquema Error con code EMAIL_ALREADY_EXISTS\", function () {",
+                  "    pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get(\"errorSchema\")));",
+                  "    pm.expect(pm.response.json().error.code).to.eql(\"EMAIL_ALREADY_EXISTS\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Obtener cliente existente [TC-04]",
+      "description": "Requisito 4 del enunciado.",
+      "item": [
+        {
+          "name": "GET /customers/{id} - cliente creado en 01",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}"
+              ]
+            },
+            "description": "TC: TC-04\nEsperado: 200 OK, body Customer igual al creado en el paso 01"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Header Content-Type es application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Body cumple el esquema Customer\", function () {",
+                  "    pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get(\"customerSchema\")));",
+                  "});",
+                  "pm.test(\"Body corresponde al cliente creado\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.eql(Number(pm.collectionVariables.get(\"customerId\")));",
+                  "    pm.expect(body.name).to.eql(pm.collectionVariables.get(\"customerName\"));",
+                  "    pm.expect(body.email).to.eql(pm.collectionVariables.get(\"customerEmail\"));",
+                  "    pm.expect(body.status).to.eql(\"ACTIVE\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - Consultar cliente inexistente [TC-10]",
+      "description": "Requisito 5 del enunciado.",
+      "item": [
+        {
+          "name": "GET /customers/{id} - id inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{missingCustomerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{missingCustomerId}}"
+              ]
+            },
+            "description": "TC: TC-10\nEsperado: 404 Not Found, CUSTOMER_NOT_FOUND"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test(\"Header Content-Type es application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Body cumple el esquema Error con code CUSTOMER_NOT_FOUND\", function () {",
+                  "    pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get(\"errorSchema\")));",
+                  "    pm.expect(pm.response.json().error.code).to.eql(\"CUSTOMER_NOT_FOUND\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /customers/{id} - id no numérico",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/customers/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "abc"
+              ]
+            },
+            "description": "TC: TC-10\nEsperado: 400 Bad Request, INVALID_ID"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Header Content-Type es application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Body cumple el esquema Error con code INVALID_ID\", function () {",
+                  "    pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get(\"errorSchema\")));",
+                  "    pm.expect(pm.response.json().error.code).to.eql(\"INVALID_ID\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 - Actualizar status válido [TC-05]",
+      "description": "Requisito 6 del enunciado.",
+      "item": [
+        {
+          "name": "PATCH /customers/{id}/status - BLOCKED",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customerId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}",
+                "status"
+              ]
+            },
+            "description": "TC: TC-05\nEsperado: 200 OK, body Customer con status BLOCKED y el resto de campos sin cambios",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"BLOCKED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Header Content-Type es application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Body cumple el esquema Customer\", function () {",
+                  "    pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get(\"customerSchema\")));",
+                  "});",
+                  "pm.test(\"status actualizado a BLOCKED y el resto sin cambios\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(\"BLOCKED\");",
+                  "    pm.expect(body.id).to.eql(Number(pm.collectionVariables.get(\"customerId\")));",
+                  "    pm.expect(body.email).to.eql(pm.collectionVariables.get(\"customerEmail\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /customers/{id} - verifica que el cambio persiste",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}"
+              ]
+            },
+            "description": "TC: TC-05\nEsperado: 200 OK, status BLOCKED"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Body cumple el esquema Customer\", function () {",
+                  "    pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get(\"customerSchema\")));",
+                  "});",
+                  "pm.test(\"El status guardado es BLOCKED\", function () {",
+                  "    pm.expect(pm.response.json().status).to.eql(\"BLOCKED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 - Actualizar status inválido [TC-11]",
+      "description": "Requisito 7 del enunciado.",
+      "item": [
+        {
+          "name": "PATCH /customers/{id}/status - FOO",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customerId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}",
+                "status"
+              ]
+            },
+            "description": "TC: TC-11\nEsperado: 400 Bad Request, VALIDATION_ERROR con details.field = status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"FOO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Header Content-Type es application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Body cumple el esquema Error con code VALIDATION_ERROR\", function () {",
+                  "    pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get(\"errorSchema\")));",
+                  "    pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_ERROR\");",
+                  "});",
+                  "pm.test(\"error.details incluye el campo 'status'\", function () {",
+                  "    const details = (pm.response.json().error || {}).details || [];",
+                  "    pm.expect(details.map(d => d.field)).to.include(\"status\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /customers/{id} - verifica que el status no cambió",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}"
+              ]
+            },
+            "description": "TC: TC-11\nEsperado: 200 OK, status sigue en BLOCKED"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"El status sigue siendo BLOCKED\", function () {",
+                  "    pm.expect(pm.response.json().status).to.eql(\"BLOCKED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "R1 - Email duplicado con otras mayúsculas [TC-09]",
+      "description": "Riesgo R-01 de la Parte 1. El email del paso 01 en mayúsculas representa el mismo buzón.",
+      "item": [
+        {
+          "name": "POST /customers - email ya registrado en mayúsculas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers"
+              ]
+            },
+            "description": "TC: TC-09\nEsperado: 409 Conflict, EMAIL_ALREADY_EXISTS (el email difiere solo en mayúsculas)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA Duplicado Mayúsculas\",\n  \"email\": \"{{customerEmailUpper}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"customerEmailUpper\", pm.collectionVariables.get(\"customerEmail\").toUpperCase());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 409\", function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "pm.test(\"Header Content-Type es application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Body cumple el esquema Error con code EMAIL_ALREADY_EXISTS\", function () {",
+                  "    pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get(\"errorSchema\")));",
+                  "    pm.expect(pm.response.json().error.code).to.eql(\"EMAIL_ALREADY_EXISTS\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "R2 - Status en minúscula [TC-12]",
+      "description": "Riesgo R-02 de la Parte 1. El catálogo de status está en mayúsculas y el alta rechaza minúsculas.",
+      "item": [
+        {
+          "name": "PATCH /customers/{id}/status - \"active\"",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customerId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}",
+                "status"
+              ]
+            },
+            "description": "TC: TC-12\nEsperado: 400 Bad Request, VALIDATION_ERROR con details.field = status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Header Content-Type es application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Body cumple el esquema Error con code VALIDATION_ERROR\", function () {",
+                  "    pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get(\"errorSchema\")));",
+                  "    pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_ERROR\");",
+                  "});",
+                  "pm.test(\"error.details incluye el campo 'status'\", function () {",
+                  "    const details = (pm.response.json().error || {}).details || [];",
+                  "    pm.expect(details.map(d => d.field)).to.include(\"status\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /customers/{id} - verifica que el status no cambió",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}"
+              ]
+            },
+            "description": "TC: TC-12\nEsperado: 200 OK, status sigue en BLOCKED y pertenece al catálogo"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Body cumple el esquema Customer\", function () {",
+                  "    pm.response.to.have.jsonSchema(JSON.parse(pm.collectionVariables.get(\"customerSchema\")));",
+                  "});",
+                  "pm.test(\"El status sigue siendo BLOCKED\", function () {",
+                  "    pm.expect(pm.response.json().status).to.eql(\"BLOCKED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "R3 - Contrato: código del alta documentado vs. real [TC-14]",
+      "description": "Riesgo R-03 de la Parte 1. Compara el contrato publicado con el código obtenido en el paso 01.",
+      "item": [
+        {
+          "name": "GET /openapi.json - código documentado para POST /customers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/openapi.json",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "openapi.json"
+              ]
+            },
+            "description": "TC: TC-14\nEsperado: El contrato documenta para POST /customers el mismo código 2xx que devolvió el alta del paso 01 (201)"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code es 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Header Content-Type es application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "const responses = ((pm.response.json().paths || {})[\"/customers\"] || {}).post?.responses || {};",
+                  "const documented = Object.keys(responses).filter(c => /^2\\d\\d$/.test(c));",
+                  "const actual = String(pm.collectionVariables.get(\"createStatusCode\"));",
+                  "",
+                  "pm.test(\"El contrato documenta un único código 2xx para POST /customers\", function () {",
+                  "    pm.expect(documented).to.have.lengthOf(1);",
+                  "});",
+                  "pm.test(`El código documentado coincide con el real del alta (${actual})`, function () {",
+                  "    pm.expect(documented[0]).to.eql(actual);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
