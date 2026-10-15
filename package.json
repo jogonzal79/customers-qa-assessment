@@ -10,10 +10,18 @@
     "db:up": "docker compose up -d --wait mysql",
     "db:down": "docker compose down",
     "export:sql": "node scripts/export-mock-to-sql.js",
-    "report:sql": "node --no-deprecation scripts/run-sql-validation.js"
+    "report:sql": "node --no-deprecation scripts/run-sql-validation.js",
+    "test:e2e": "node scripts/run-e2e.js",
+    "test:e2e:stable": "playwright test --grep-invert @known-risk",
+    "test:e2e:headed": "playwright test --headed",
+    "report:e2e": "playwright show-report",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^26.6.5",
     "newman": "^6.2.1",
-    "newman-reporter-htmlextra": "^1.23.1"
+    "newman-reporter-htmlextra": "^1.23.1",
+    "typescript": "^7.0.2"
   }
 }

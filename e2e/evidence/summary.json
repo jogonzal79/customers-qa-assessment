@@ -1,0 +1,131 @@
+{
+  "generatedAt": "2026-10-15T23:53:18.117Z",
+  "startTime": "2026-10-15T23:53:09.512Z",
+  "durationMs": 8487,
+  "totals": {
+    "tests": 4,
+    "passed": 3,
+    "failed": 1,
+    "flaky": 0,
+    "skipped": 0
+  },
+  "tests": [
+    {
+      "tc": "TC-19",
+      "title": "TC-19 alta desde la UI: el cliente aparece en la búsqueda con su status y existe en la API",
+      "tags": [
+        "@positive",
+        "@e2e"
+      ],
+      "location": "tests/e2e/customers.spec.ts:5",
+      "status": "passed",
+      "durationMs": 631,
+      "risk": null,
+      "apiResponse": null,
+      "uiMessage": null,
+      "steps": [
+        {
+          "title": "Abrir la aplicación",
+          "passed": true
+        },
+        {
+          "title": "Crear el cliente desde el formulario",
+          "passed": true
+        },
+        {
+          "title": "Buscarlo por nombre",
+          "passed": true
+        },
+        {
+          "title": "Buscarlo por email y validar la fila y el status",
+          "passed": true
+        },
+        {
+          "title": "Verificar por API que el cliente existe con los mismos datos",
+          "passed": true
+        }
+      ],
+      "error": null,
+      "evidence": {}
+    },
+    {
+      "tc": "TC-21",
+      "title": "TC-21 búsqueda sin resultados: muestra el estado vacío y al limpiar vuelve el listado",
+      "tags": [
+        "@negative"
+      ],
+      "location": "tests/e2e/customers.spec.ts:46",
+      "status": "passed",
+      "durationMs": 411,
+      "risk": null,
+      "apiResponse": null,
+      "uiMessage": null,
+      "steps": [
+        {
+          "title": "Buscar un término sin coincidencias",
+          "passed": true
+        },
+        {
+          "title": "Limpiar la búsqueda",
+          "passed": true
+        }
+      ],
+      "error": null,
+      "evidence": {}
+    },
+    {
+      "tc": "TC-20",
+      "title": "TC-20 alta con email duplicado: la UI muestra el error que devuelve la API",
+      "tags": [
+        "@negative",
+        "@known-risk"
+      ],
+      "location": "tests/e2e/customers.spec.ts:68",
+      "status": "failed",
+      "durationMs": 5565,
+      "risk": "R-04 / TC-20: la UI informa éxito sin verificar la respuesta del POST",
+      "apiResponse": "POST /customers → 409 EMAIL_ALREADY_EXISTS",
+      "uiMessage": "data-status=\"success\" · texto=\"Cliente creado correctamente\" (respuesta HTTP 409)",
+      "steps": [
+        {
+          "title": "La API rechaza el alta con 409 Conflict",
+          "passed": true
+        },
+        {
+          "title": "La UI informa el error y no muestra éxito",
+          "passed": false
+        }
+      ],
+      "error": "Error: La UI debe reflejar el error de la API\n\nexpect(locator).toHaveAttribute(expected) failed\n\nLocator:  getByTestId('create-message')\nExpected: \"error\"\nReceived: \"success\"\nTimeout:  5000ms\n\nCall log:\n  - La UI debe reflejar el error de la API getByTestId('create-message') with timeout 5000ms\n  - waiting for getByTestId('create-message')\n    14 × locator resolved to <div role=\"status\" aria-live=\"polite\" id=\"create-message\" data-status=\"success\" class=\"message success\" data-testid=\"create-message\">Cliente creado correctamente</div>\n       - unexpected value \"success\"\n\n\n   99 |           description: `data-status=\"${shown}\" · texto=\"${text?.trim()}\" (respuesta HTTP ${response.status()})`,\n  100 |         });\n> 101 |         await expect(customersPage.createMessage, 'La UI debe reflejar el error de la API').toHaveAttribute('data-status', 'error');\n      |                                                                                             ^\n  102 |         await expect(customersPage.createMessage).not.toHaveText('Cliente creado correctamente');\n  103 |       });\n  104 |\n    at C:\\Users\\Jonathan Gonzalez\\Documents\\Jonathan\\customers-qa-assessment\\tests\\e2e\\customers.spec.ts:101:93\n    at C:\\Users\\Jonathan Gonzalez\\Documents\\Jonathan\\customers-qa-assessment\\tests\\e2e\\customers.spec.ts:93:7",
+      "evidence": {
+        "screenshot": "e2e/evidence/TC-20/screenshot.png",
+        "trace": "e2e/evidence/TC-20/trace.zip"
+      }
+    },
+    {
+      "tc": "TC-22",
+      "title": "TC-22 status cambiado por API se muestra actualizado en la UI",
+      "tags": [
+        "@integration"
+      ],
+      "location": "tests/e2e/customers.spec.ts:111",
+      "status": "passed",
+      "durationMs": 440,
+      "risk": null,
+      "apiResponse": null,
+      "uiMessage": null,
+      "steps": [
+        {
+          "title": "Cambiar el status por API",
+          "passed": true
+        },
+        {
+          "title": "Recargar y validar el status en la tabla",
+          "passed": true
+        }
+      ],
+      "error": null,
+      "evidence": {}
+    }
+  ]
+}
