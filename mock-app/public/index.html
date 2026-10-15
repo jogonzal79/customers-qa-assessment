@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gestión de Clientes</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header>
+    <h1 data-testid="page-title">Gestión de Clientes</h1>
+    <a href="/docs" data-testid="link-docs">Documentación API</a>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Nuevo cliente</h2>
+      <form id="customer-form" data-testid="customer-form" novalidate>
+        <label for="name">Nombre</label>
+        <input id="name" name="name" type="text" data-testid="input-name" autocomplete="off">
+
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" data-testid="input-email" autocomplete="off">
+
+        <label for="status">Status</label>
+        <select id="status" name="status" data-testid="select-status">
+          <option value="PENDING">PENDING</option>
+          <option value="ACTIVE">ACTIVE</option>
+          <option value="BLOCKED">BLOCKED</option>
+        </select>
+
+        <button type="submit" data-testid="btn-create">Crear cliente</button>
+      </form>
+      <div id="create-message" class="message" data-testid="create-message" role="status" aria-live="polite" hidden></div>
+    </section>
+
+    <section class="card">
+      <h2>Clientes</h2>
+      <form id="search-form" class="search" data-testid="search-form">
+        <input id="search" type="search" placeholder="Buscar por nombre o email" data-testid="search-input" aria-label="Buscar por nombre o email">
+        <button type="submit" data-testid="btn-search">Buscar</button>
+        <button type="button" id="btn-clear" data-testid="btn-clear-search">Limpiar</button>
+      </form>
+
+      <p class="count" data-testid="customers-count"></p>
+      <table data-testid="customers-table">
+        <thead>
+          <tr><th>ID</th><th>Nombre</th><th>Email</th><th>Status</th><th>Creado</th></tr>
+        </thead>
+        <tbody id="customers-body" data-testid="customers-body"></tbody>
+      </table>
+      <p id="empty-state" class="empty" data-testid="empty-state" hidden>No se encontraron clientes.</p>
+      <p id="list-error" class="message error" data-testid="list-error" hidden></p>
+    </section>
+  </main>
+
+  <script src="/app-config.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

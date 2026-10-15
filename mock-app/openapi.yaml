@@ -1,0 +1,221 @@
+openapi: 3.0.3
+info:
+  title: Customers API
+  version: 1.0.0
+  description: |
+    API REST de gestión de clientes (mock local para el assessment de QA Automation).
+servers:
+  - url: http://localhost:3000
+tags:
+  - name: Customers
+paths:
+  /customers:
+    post:
+      tags: [Customers]
+      summary: Crear un cliente
+      operationId: createCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerCreate'
+            example:
+              name: Pedro Sánchez
+              email: pedro.sanchez@example.com
+              status: ACTIVE
+      responses:
+        '201':
+          description: Cliente creado
+          headers:
+            Location:
+              description: URL del cliente creado
+              schema:
+                type: string
+                example: /customers/6
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Ya existe un cliente con ese email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: EMAIL_ALREADY_EXISTS
+                  message: Ya existe un cliente con el email juan.perez@example.com
+    get:
+      tags: [Customers]
+      summary: Listar clientes
+      operationId: listCustomers
+      parameters:
+        - name: search
+          in: query
+          required: false
+          description: Filtra por coincidencia parcial en name o email (sin distinguir mayúsculas).
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de clientes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
+  /customers/{id}:
+    get:
+      tags: [Customers]
+      summary: Obtener un cliente por id
+      operationId: getCustomer
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      responses:
+        '200':
+          description: Cliente encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/InvalidId'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /customers/{id}/status:
+    patch:
+      tags: [Customers]
+      summary: Cambiar el status de un cliente
+      operationId: updateCustomerStatus
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StatusUpdate'
+            example:
+              status: BLOCKED
+      responses:
+        '200':
+          description: Status actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  parameters:
+    CustomerId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+  schemas:
+    Status:
+      type: string
+      enum: [ACTIVE, PENDING, BLOCKED]
+    Customer:
+      type: object
+      required: [id, name, email, status, created_at]
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Juan Pérez
+        email:
+          type: string
+          format: email
+          example: juan.perez@example.com
+        status:
+          $ref: '#/components/schemas/Status'
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-01-10T09:00:00.000Z'
+    CustomerCreate:
+      type: object
+      required: [name, email]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        status:
+          allOf:
+            - $ref: '#/components/schemas/Status'
+          default: PENDING
+    StatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/Status'
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+  responses:
+    BadRequest:
+      description: Datos de entrada inválidos o JSON mal formado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Datos de entrada inválidos
+              details:
+                - field: email
+                  message: email no tiene un formato válido
+    InvalidId:
+      description: El id no es un entero positivo
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: El cliente no existe
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: CUSTOMER_NOT_FOUND
+              message: No existe el cliente con id 999
