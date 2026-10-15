@@ -1,0 +1,79 @@
+# Pruebas del esquema recomendado
+# Generado: 2026-10-15T23:42:57.302Z · MySQL 8.4.11
+
+-- T1. Cargar las filas sin problemas
+SET @status_customer_id = 6;
+SET @duplicate_id = 7;
+INSERT INTO customers_recommended (id, name, email, status, created_at)
+SELECT c.id, c.name, c.email, c.status, c.created_at
+FROM customers c
+WHERE c.status COLLATE utf8mb4_bin IN ('ACTIVE', 'PENDING', 'BLOCKED')
+  AND c.id = (SELECT MIN(d.id) FROM customers d WHERE LOWER(TRIM(d.email)) = LOWER(TRIM(c.email)))
+ORDER BY c.id;
+
+OK (sin filas de salida)
+
+-- T2. Status fuera del catálogo, tal como lo guardó la API (TC-12)
+SET @status_customer_id = 6;
+SET @duplicate_id = 7;
+INSERT INTO customers_recommended (id, name, email, status, created_at)
+SELECT id, name, email, status, created_at
+FROM customers
+WHERE id = @status_customer_id;
+
+ERROR 3819 (HY000) at line 3: Check constraint 'ck_customers_recommended_status' is violated.
+
+-- T3. El mismo cliente con el status que debía conservar (BLOCKED, TC-05)
+SET @status_customer_id = 6;
+SET @duplicate_id = 7;
+INSERT INTO customers_recommended (id, name, email, status, created_at)
+SELECT id, name, email, 'BLOCKED', created_at
+FROM customers
+WHERE id = @status_customer_id;
+
+OK (sin filas de salida)
+
+-- T4. Email duplicado que difiere solo en mayúsculas (TC-09)
+SET @status_customer_id = 6;
+SET @duplicate_id = 7;
+INSERT INTO customers_recommended (id, name, email, status, created_at)
+SELECT id, name, email, status, created_at
+FROM customers
+WHERE id = @duplicate_id;
+
+ERROR 1062 (23000) at line 3: Duplicate entry 'qa.auto.1792107772592.8520@example.com' for key 'customers_recommended.uq_customers_recommended_email'
+
+-- T5. Por qué no ENUM: MySQL normaliza el valor en silencio
+SET @status_customer_id = 6;
+SET @duplicate_id = 7;
+DROP TEMPORARY TABLE IF EXISTS enum_demo;
+CREATE TEMPORARY TABLE enum_demo (
+  status ENUM('ACTIVE', 'PENDING', 'BLOCKED') NOT NULL
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+INSERT INTO enum_demo (status) VALUES ('active');
+SELECT 'active' AS valor_enviado, status AS valor_guardado FROM enum_demo;
+
++---------------+----------------+
+| valor_enviado | valor_guardado |
++---------------+----------------+
+| active        | ACTIVE         |
++---------------+----------------+
+
+-- T6. Estado final de customers_recommended
+SET @status_customer_id = 6;
+SET @duplicate_id = 7;
+SELECT id, name, email, email_normalized, status, created_at
+FROM customers_recommended
+ORDER BY id;
+
++----+----------------------------+----------------------------------------+----------------------------------------+---------+-------------------------+
+| id | name                       | email                                  | email_normalized                       | status  | created_at              |
++----+----------------------------+----------------------------------------+----------------------------------------+---------+-------------------------+
+|  1 | Juan Pérez                 | juan.perez@example.com                 | juan.perez@example.com                 | ACTIVE  | 2026-01-10 09:00:00.000 |
+|  2 | María García               | maria.garcia@example.com               | maria.garcia@example.com               | ACTIVE  | 2026-02-14 11:30:00.000 |
+|  3 | Carlos López               | carlos.lopez@example.com               | carlos.lopez@example.com               | PENDING | 2026-03-01 15:45:00.000 |
+|  4 | Ana Martínez               | ana.martinez@example.com               | ana.martinez@example.com               | BLOCKED | 2026-04-20 08:15:00.000 |
+|  5 | Luis Rodríguez             | luis.rodriguez@example.com             | luis.rodriguez@example.com             | PENDING | 2026-05-05 17:00:00.000 |
+|  6 | Cliente QA Automatización  | qa.auto.1792107772592.8520@example.com | qa.auto.1792107772592.8520@example.com | BLOCKED | 2026-10-15 23:42:52.610 |
++----+----------------------------+----------------------------------------+----------------------------------------+---------+-------------------------+
+

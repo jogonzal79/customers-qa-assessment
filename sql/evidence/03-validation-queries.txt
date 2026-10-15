@@ -1,0 +1,96 @@
+# Consultas de validación (esquema observado)
+# Generado: 2026-10-15T23:42:57.301Z · MySQL 8.4.11
+
+-- Q1. Localizar un cliente por email
+SET @email = 'qa.auto.1792107772592.8520@example.com';
+SELECT id, name, email, status, created_at
+FROM customers
+WHERE LOWER(TRIM(email)) = LOWER(TRIM(@email))
+ORDER BY id;
+
++----+----------------------------+----------------------------------------+---------+-------------------------+
+| id | name                       | email                                  | status  | created_at              |
++----+----------------------------+----------------------------------------+---------+-------------------------+
+|  6 | Cliente QA Automatización  | qa.auto.1792107772592.8520@example.com | active  | 2026-10-15 23:42:52.610 |
+|  7 | QA Duplicado Mayúsculas    | QA.AUTO.1792107772592.8520@EXAMPLE.COM | PENDING | 2026-10-15 23:42:52.907 |
++----+----------------------------+----------------------------------------+---------+-------------------------+
+
+-- Q2. Verificar el status del cliente
+SET @email = 'qa.auto.1792107772592.8520@example.com';
+SELECT id,
+       email,
+       status,
+       IF(status COLLATE utf8mb4_bin = 'BLOCKED', 'SI', 'NO')                             AS status_esperado,
+       IF(status COLLATE utf8mb4_bin IN ('ACTIVE', 'PENDING', 'BLOCKED'), 'SI', 'NO')    AS en_catalogo
+FROM customers
+WHERE email COLLATE utf8mb4_bin = @email;
+
++----+----------------------------------------+--------+-----------------+-------------+
+| id | email                                  | status | status_esperado | en_catalogo |
++----+----------------------------------------+--------+-----------------+-------------+
+|  6 | qa.auto.1792107772592.8520@example.com | active | NO              | NO          |
++----+----------------------------------------+--------+-----------------+-------------+
+
+-- Q3. Detectar emails duplicados
+SET @email = 'qa.auto.1792107772592.8520@example.com';
+SELECT LOWER(TRIM(email))                    AS email_normalizado,
+       COUNT(*)                              AS total,
+       GROUP_CONCAT(id ORDER BY id)          AS ids,
+       GROUP_CONCAT(email ORDER BY id SEPARATOR ' | ') AS variantes
+FROM customers
+GROUP BY LOWER(TRIM(email))
+HAVING COUNT(*) > 1;
+
++----------------------------------------+-------+------+---------------------------------------------------------------------------------+
+| email_normalizado                      | total | ids  | variantes                                                                       |
++----------------------------------------+-------+------+---------------------------------------------------------------------------------+
+| qa.auto.1792107772592.8520@example.com |     2 | 6,7  | qa.auto.1792107772592.8520@example.com | QA.AUTO.1792107772592.8520@EXAMPLE.COM |
++----------------------------------------+-------+------+---------------------------------------------------------------------------------+
+
+-- Q4. Listar los últimos 5 clientes creados
+SET @email = 'qa.auto.1792107772592.8520@example.com';
+SELECT id, name, email, status, created_at
+FROM customers
+ORDER BY created_at DESC, id DESC
+LIMIT 5;
+
++----+----------------------------+----------------------------------------+---------+-------------------------+
+| id | name                       | email                                  | status  | created_at              |
++----+----------------------------+----------------------------------------+---------+-------------------------+
+|  7 | QA Duplicado Mayúsculas    | QA.AUTO.1792107772592.8520@EXAMPLE.COM | PENDING | 2026-10-15 23:42:52.907 |
+|  6 | Cliente QA Automatización  | qa.auto.1792107772592.8520@example.com | active  | 2026-10-15 23:42:52.610 |
+|  5 | Luis Rodríguez             | luis.rodriguez@example.com             | PENDING | 2026-05-05 17:00:00.000 |
+|  4 | Ana Martínez               | ana.martinez@example.com               | BLOCKED | 2026-04-20 08:15:00.000 |
+|  3 | Carlos López               | carlos.lopez@example.com               | PENDING | 2026-03-01 15:45:00.000 |
++----+----------------------------+----------------------------------------+---------+-------------------------+
+
+-- Q5. Status fuera del catálogo (TC-23 Q2)
+SET @email = 'qa.auto.1792107772592.8520@example.com';
+SELECT id, email, status
+FROM customers
+WHERE status COLLATE utf8mb4_bin NOT IN ('ACTIVE', 'PENDING', 'BLOCKED');
+
++----+----------------------------------------+--------+
+| id | email                                  | status |
++----+----------------------------------------+--------+
+|  6 | qa.auto.1792107772592.8520@example.com | active |
++----+----------------------------------------+--------+
+
+-- Q6. Campos obligatorios nulos o vacíos (TC-23 Q3)
+SET @email = 'qa.auto.1792107772592.8520@example.com';
+SELECT id, name, email, created_at
+FROM customers
+WHERE name IS NULL OR TRIM(name) = ''
+   OR email IS NULL OR TRIM(email) = ''
+   OR created_at IS NULL;
+
+Empty set (0 filas)
+
+-- Q7. Fechas de creación en el futuro (TC-23 Q4)
+SET @email = 'qa.auto.1792107772592.8520@example.com';
+SELECT id, email, created_at
+FROM customers
+WHERE created_at > UTC_TIMESTAMP(3);
+
+Empty set (0 filas)
+

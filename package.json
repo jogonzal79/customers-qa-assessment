@@ -6,7 +6,11 @@
   "scripts": {
     "mock": "npm --prefix mock-app start",
     "test:api": "newman run postman/customers-api.postman_collection.json -e postman/local.postman_environment.json -r cli",
-    "report:api": "newman run postman/customers-api.postman_collection.json -e postman/local.postman_environment.json -r cli,json,htmlextra --reporter-json-export postman/reports/newman-report.json --reporter-htmlextra-export postman/reports/newman-report.html --reporter-htmlextra-title \"Customers API - Evidencia Newman\" --suppress-exit-code && node scripts/generate-api-evidence.js"
+    "report:api": "newman run postman/customers-api.postman_collection.json -e postman/local.postman_environment.json -r cli,json,htmlextra --reporter-json-export postman/reports/newman-report.json --reporter-htmlextra-export postman/reports/newman-report.html --reporter-htmlextra-title \"Customers API - Evidencia Newman\" --suppress-exit-code && node scripts/generate-api-evidence.js",
+    "db:up": "docker compose up -d --wait mysql",
+    "db:down": "docker compose down",
+    "export:sql": "node scripts/export-mock-to-sql.js",
+    "report:sql": "node --no-deprecation scripts/run-sql-validation.js"
   },
   "devDependencies": {
     "newman": "^6.2.1",
