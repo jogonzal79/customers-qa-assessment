@@ -26,7 +26,7 @@ Assessment técnico de QA Automation sobre una aplicación de gestión de client
 
 - **Node.js ≥ 20** (lo exige Playwright; el mock por sí solo funciona con Node 18).
 - **Git**.
-- **Docker Desktop**, solo para la Parte 4 (MySQL).
+- **Docker Desktop**, solo para la Parte 4 (MySQL). Debe estar **abierto** (daemon en ejecución) antes de `npm run db:up`.
 
 ## Instalación y ejecución
 
@@ -38,11 +38,15 @@ npx playwright install chromium # navegador para la Parte 5
 npm run mock                    # en otra terminal: http://localhost:3000  (Swagger en /docs)
 ```
 
+- La primera vez se descargan Chromium (~120 MB, con `playwright install`) y la imagen `mysql:8.4` (con `db:up`).
+- `npm install` muestra avisos de `npm audit`: provienen de dependencias transitivas de Newman, que solo se usan en
+  local contra el mock. Pueden ignorarse.
+
 | Parte | Comando | Requiere |
 |---|---|---|
 | 2 · API | `npm run test:api` — ejecuta la colección con Newman<br>`npm run report:api` — ejecuta y regenera la evidencia (`postman/reports/`, `docs/02`) | Mock en ejecución |
 | 4 · SQL | `npm run db:up` → `npm run report:sql` → `npm run db:down` (limpieza) | Mock en ejecución y Docker |
-| 5 · E2E | `npm run test:e2e` — **comando de referencia**; copia la evidencia y regenera `docs/05`<br>`npm run test:e2e:stable` — para CI, excluye los riesgos conocidos (`@known-risk`)<br>`npm run report:e2e` — abre el reporte HTML | Levanta el mock si no está corriendo |
+| 5 · E2E | `npm run test:e2e` — **comando de referencia**; copia la evidencia y regenera `docs/05`<br>`npm run test:e2e:stable` — para CI, excluye los riesgos conocidos (`@known-risk`)<br>`npm run report:e2e` — sirve el reporte HTML en `http://localhost:9323` hasta pulsar Ctrl+C | Levanta el mock si no está corriendo |
 
 Los comandos `report:api`, `report:sql` y `test:e2e` **regeneran la evidencia versionada** (documentos y reportes).
 Para volver a la versión del repo: `git restore .`
